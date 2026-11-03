@@ -29,19 +29,46 @@ const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxJ2S3z23PEU41oTRP9
 
 const TOOLS = [
   {
+    name: 'rf_workspace_action',
+    description: 'BẮT BUỘC GỌI CÔNG CỤ NÀY khi người dùng yêu cầu: 1. Chuyển trạng thái đơn hàng (Đang Sản Xuất, Sẵn Sàng Đóng Gói, Chờ Bàn Giao, Đã Bàn Giao). 2. Bàn giao chở kho đơn hàng. 3. Hoàn thành đóng gói đơn hàng. 4. Nhận làm Khâu 1 hoặc Khâu 2 sản xuất (theo mã đuôi đơn 3-4 ký tự hoặc theo tên mẫu layout như Biotop Cuội, Hang Động 4). 5. Báo xong hoàn thành Khâu 1 hoặc Khâu 2. Hệ thống sẽ ghi nhận và cập nhật trực tiếp vào CSDL xưởng Rich Fish Aquarium.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['nhan_k1', 'xong_k1', 'nhan_k2', 'xong_k2', 'dong_goi', 'ban_giao', 'chuyen_trang_thai'],
+          description: 'Hành động cần làm: nhan_k1 (nhận khâu 1), xong_k1 (xong khâu 1), nhan_k2 (nhận khâu 2), xong_k2 (xong khâu 2), dong_goi (hoàn thành đóng gói), ban_giao (bàn giao đơn chở kho), chuyen_trang_thai (chuyển trạng thái đơn)'
+        },
+        target: {
+          type: 'string',
+          description: 'Mã đuôi đơn hàng (ví dụ: W7SH, 6418, 7SH) hoặc tên mẫu sản phẩm bù kho (ví dụ: Biotop Cuội, Hang Động 4, HAN004, STD002)'
+        },
+        worker: {
+          type: 'string',
+          description: 'Tên nhân sự thực hiện: Dương, Hương, Quang Anh, Tiến, Trang'
+        },
+        query: {
+          type: 'string',
+          description: 'Toàn văn câu nói của người dùng'
+        }
+      },
+      required: ['query']
+    }
+  },
+  {
     name: 'rf_workspace_query',
-    description: 'Tra cứu toàn bộ 23 bảng CSDL thời gian thực của xưởng Rich Fish Aquarium (RF Workspace Pro): 1. Đơn hàng (số đơn hôm nay, doanh thu, chi tiết đơn Shopee VN / Shopee Singapore xuất khẩu, đơn chờ bàn giao, đối soát). 2. Sản xuất & Đóng gói (lệnh sản xuất khâu 1 cắt dán, khâu 2 gia cố, QC, đóng gói, năng suất thợ). 3. Kho hàng & Vật tư (549+ mã SKU tồn kho, tổng giá trị kho, mã sắp hết hàng, tra cứu tồn kho từng sản phẩm, phiếu xuất nhập kho, định mức BOM). 4. Báo cáo lợi nhuận P&L (kết quả kinh doanh, doanh thu, phí sàn, lãi ròng từng kênh Shopee VN, Bán lẻ, TikTok, CTV, Xuất khẩu và chi phí công ty). 5. Bảng lương & Nhân sự (bảng lương chi tiết từng người, tổng quỹ lương, quân số chấm công đi làm hôm nay, thưởng phạt, KPI, tài chính CTV). 6. Tài chính & Thu chi (dòng tiền thu chi, số dư tài khoản ngân hàng, công nợ nhà cung cấp). 7. Chính sách xưởng (bảo hiểm bể vỡ 100%, bảo hành rò rỉ nước 6 tháng, quy chuẩn đóng gói 4 lớp chống sốc).',
+    description: 'Tra cứu thông tin và quản trị 23 bảng CSDL xưởng Rich Fish Aquarium: Chi tiết đơn hàng theo 3-4 số cuối, tìm đơn hàng, tiến độ sản xuất, đóng gói, kho hàng tồn kho, báo cáo P&L lợi nhuận các kênh, bảng lương, chấm công đi làm, thu chi tài chính quỹ.',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Nội dung câu hỏi chi tiết của người dùng (ví dụ: báo cáo P&L lợi nhuận các kênh, bảng lương nhân viên, lương của Dương, kho hàng còn gì, thu chi thế nào, số dư tài khoản, công nợ nhà cung cấp, đơn Shopee Singapore giá bao nhiêu, nay mấy đơn...)'
+          description: 'Nội dung tra cứu chi tiết của người dùng'
         },
         type: {
           type: 'string',
           enum: ['all', 'orders', 'production', 'packing', 'inventory', 'profit', 'salary', 'attendance', 'finance', 'policy', 'kpi'],
-          description: 'Phân loại: profit (báo cáo P&L lợi nhuận lãi lỗ các kênh), salary (bảng lương/thu nhập từng người), attendance (chấm công đi làm), orders (đơn hàng), production (sản xuất), packing (đóng gói), inventory (kho hàng/tồn kho/xuất nhập), finance (thu chi/sổ quỹ/công nợ), policy (chính sách bảo hành đóng gói), all (tổng hợp)'
+          description: 'Phân loại dữ liệu cần tra cứu'
         }
       }
     }
@@ -531,6 +558,40 @@ function buildAnswerFromBrain(brain, rawQuery = '', reqType = 'all') {
     finalRes = (cutPos > 1500 ? finalRes.slice(0, cutPos) : finalRes.slice(0, 2000)) + '\n...';
   }
   return finalRes;
+}
+
+async function handleActionTool(args) {
+  args = args || {};
+  const query = args.query || '';
+  const actionParam = args.action || '';
+  const targetParam = args.target || '';
+  const workerParam = args.worker || '';
+
+  // Ưu tiên trích xuất từ query nếu có
+  const voiceAction = detectVoiceProductionAction(query);
+  const actionType = actionParam || voiceAction?.actionType || 'chuyen_trang_thai';
+  const orderToken = targetParam || voiceAction?.orderToken || extractOrderToken(query);
+  const workerName = workerParam || voiceAction?.workerName || 'Nguyễn Hoàng Dương';
+
+  if (!orderToken) {
+    return 'Dạ Sếp, em chưa nhận diện được mã đơn hàng hoặc tên sản phẩm cần thao tác. Sếp đọc lại giúp em 3 hoặc 4 ký tự cuối đơn hàng nhé!';
+  }
+
+  log(`🎯 [RF Bridge Action Tool] Thực thi action=${actionType}, target=${orderToken}, worker=${workerName}`);
+  try {
+    const apiUrl = `${GAS_API_URL}&action=rfBotVoiceProductionAction&orderToken=${encodeURIComponent(orderToken)}&actionType=${encodeURIComponent(actionType)}&workerName=${encodeURIComponent(workerName)}`;
+    const resp = await fetch(apiUrl, { redirect: 'follow' });
+    const json = await resp.json();
+    if (json && json.speech_text) {
+      log(`✅ [RF Bridge Action Tool] Thành công: ${json.speech_text}`);
+      syncBrainInBackground();
+      return json.speech_text;
+    }
+    return 'Dạ, hệ thống đã ghi nhận cập nhật đơn thành công!';
+  } catch (err) {
+    log(`⚠️ [RF Bridge Action Tool] Lỗi: ${err.message}`);
+    return 'Dạ xin lỗi sếp, xảy ra lỗi kết nối khi cập nhật đơn hàng: ' + err.message;
+  }
 }
 
 async function handleToolQuery(query, type) {
