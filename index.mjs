@@ -567,23 +567,39 @@ async function handleActionTool(args) {
   const targetParam = args.target || '';
   const workerParam = args.worker || '';
 
+  const qNorm = normVN(query);
+  const isBulkHandover = /tat ca|toan bo|het|cac don|tat ca cac don/i.test(qNorm) || (qNorm.includes('ban giao') && !qNorm.match(/[a-z0-9]{3,20}/));
+  
   // Ưu tiên trích xuất từ query nếu có
   const voiceAction = detectVoiceProductionAction(query);
-  const actionType = actionParam || voiceAction?.actionType || 'chuyen_trang_thai';
-  const orderToken = targetParam || voiceAction?.orderToken || extractOrderToken(query);
+  let actionType = actionParam || voiceAction?.actionType || 'chuyen_trang_thai';
+  let orderToken = targetParam || voiceAction?.orderToken || extractOrderToken(query);
   const workerName = workerParam || voiceAction?.workerName || 'Nguyễn Hoàng Dương';
 
-  if (!orderToken) {
-    return 'Dạ Sếp, em chưa nhận diện được mã đơn hàng hoặc tên sản phẩm cần thao tác. Sếp đọc lại giúp em 3 hoặc 4 ký tự cuối đơn hàng nhé!';
+  // Hỗ trợ bàn giao tất cả
+  if (isBulkHandover && (actionType === 'ban_giao' || /ban giao|cho kho/i.test(qNorm))) {
+    actionType = 'ban_giao';
+    orderToken = 'ALL';
   }
 
-  log(`🎯 [RF Bridge Action Tool] Thực thi action=${actionType}, target=${orderToken}, worker=${workerName}`);
+  if (!orderToken) {
+    const waitingList = (cachedBrain?.orders?.todayOrdersList || [])
+      .filter(o => o.status !== 'Đã Bàn Giao' && o.status !== 'Đơn Huỷ')
+      .map(o => (o.code || '').split('|')[0].trim().slice(-4));
+    const waitStr = waitingList.length > 0 ? waitingList.join(', ') : '';
+    if (waitingList.length > 0) {
+      return `Dạ Sếp, hôm nay có ${waitingList.length} đơn chờ bàn giao đuôi: ${waitStr}. Sếp muốn bàn giao đơn nào, hay bảo em "bàn giao tất cả" luôn ạ?`;
+    }
+    return 'Dạ Sếp, em chưa nhận diện được mã đơn hàng. Sếp đọc lại giúp em 3 hoặc 4 ký tự cuối đơn hàng (ví dụ: bàn giao đơn W7SH) nhé!';
+  }
+
+  log(`🎯 [RF Bridge Action Tool] Thực thi action=${actionType}, target=${orderToken}, worker=${workerName}, query="${query}"`);
   try {
-    const apiUrl = `${GAS_API_URL}&action=rfBotVoiceProductionAction&orderToken=${encodeURIComponent(orderToken)}&actionType=${encodeURIComponent(actionType)}&workerName=${encodeURIComponent(workerName)}`;
+    const apiUrl = `${GAS_API_URL}&action=rfBotVoiceProductionAction&orderToken=${encodeURIComponent(orderToken)}&actionType=${encodeURIComponent(actionType)}&workerName=${encodeURIComponent(workerName)}&query=${encodeURIComponent(query)}`;
     const resp = await fetch(apiUrl, { redirect: 'follow' });
     const json = await resp.json();
     if (json && json.speech_text) {
-      log(`✅ [RF Bridge Action Tool] Thành công: ${json.speech_text}`);
+      log(`✅ [RF Bridge Action Tool] Kết quả từ GAS: ${json.speech_text}`);
       syncBrainInBackground();
       return json.speech_text;
     }
