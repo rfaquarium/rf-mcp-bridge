@@ -218,9 +218,10 @@ function detectVoiceProductionAction(query) {
   if (!actionType) return null;
 
   let workerName = 'Nguyễn Hoàng Dương';
-  if (/tam/.test(qNorm)) workerName = 'Nguyễn Hữu Tâm';
+  if (/quang\s*anh|anh/.test(qNorm)) workerName = 'Hà Quang Anh';
   else if (/huong/.test(qNorm)) workerName = 'Nguyễn Thị Diệu Hương';
   else if (/tien|sep/.test(qNorm)) workerName = 'Nguyễn Ngọc Tiến';
+  else if (/trang/.test(qNorm)) workerName = 'Nguyễn Thị Huyền Trang';
   else if (/duong/.test(qNorm)) workerName = 'Nguyễn Hoàng Dương';
 
   return { actionType, workerName, orderToken: token };
