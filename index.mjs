@@ -178,8 +178,8 @@ function parseAccessoriesText(accRaw, noteRaw) {
  */
 function extractOrderToken(query) {
   if (!query) return null;
-  let clean = String(query).replace(/\b([a-zA-Z0-9])\s+(?=[a-zA-Z0-9]\b)/gi, '$1');
-  clean = clean.replace(/\b([a-zA-Z0-9])\s+(?=[a-zA-Z0-9]\b)/gi, '$1');
+  // 1. Bắt token sau các từ khóa chỉ định đơn hàng
+  let clean = String(query).replace(/(?:đơn\s+hàng|đơn|mã|đuôi)\s+([a-zA-Z0-9\s]{2,16})/i, (m, g) => 'đơn ' + g.replace(/\s+/g, ''));
 
   const directMatch = clean.match(/(?:đơn\s+hàng|đơn|mã|đuôi)\s+([a-zA-Z0-9]{3,25})/i);
   if (directMatch && directMatch[1]) {
@@ -189,6 +189,16 @@ function extractOrderToken(query) {
     }
   }
 
+  // 2. Bắt theo tên mẫu sản phẩm / layout bù kho (để không cần đọc mã hex KHO_M_... dài ngoằng)
+  const qNorm = normVN(query);
+  if (/biotop\s*cuoi|cuoi\s*ver\s*2|cuoi\s*2|std002/i.test(qNorm)) return 'Biotop Cuội';
+  if (/hang\s*dong\s*ver\s*4|hang\s*dong\s*4|han004/i.test(qNorm)) return 'Hang Động ver.4';
+  if (/hang\s*dong\s*ver\s*5|hang\s*dong\s*5/i.test(qNorm)) return 'Hang Động ver.5';
+  if (/rung\s*ver\s*19|rung\s*19/i.test(qNorm)) return 'Rừng ver.19';
+  if (/rung\s*ver\s*17|rung\s*17/i.test(qNorm)) return 'Rừng ver.17';
+  if (/be\s*30x18x12|be\s*30\s*18\s*12/i.test(qNorm)) return 'Bể 30x18x12';
+
+  // 3. Quét token chữ/số 3-25 ký tự không thuộc stop words
   const tokens = (clean.match(/[a-zA-Z0-9]{3,25}/g) || []).map(t => t.toUpperCase());
   const stopWords = new Set(['DON', 'HANG', 'KHAU', 'BAN', 'TIM', 'KIEM', 'TRA', 'XEM', 'CHO', 'NAO', 'TIEN', 'DUONG', 'TAM', 'HOM', 'NAY', 'XONG', 'NHAN', 'CHUA', 'LAM', 'GIA', 'DONG', 'GOI', 'SHOP', 'CUA', 'NGUYEN', 'ALL', 'THE', 'VI', 'DU', 'BAO', 'MAY', 'CON']);
   let filtered = tokens.filter(t => !stopWords.has(t) && (!/^\d+$/.test(t) || t.length >= 4));
@@ -205,7 +215,11 @@ function detectVoiceProductionAction(query) {
   if (!token) return null;
 
   let actionType = null;
-  if (/nhan.*khau\s*1|nhan.*k1|lam.*khau\s*1|lam.*k1|nhan.*don/.test(qNorm)) {
+  if (/dong\s*goi|hoan\s*thanh.*dong\s*goi|xong.*dong\s*goi|dong\s*xong|da\s*dong\s*goi/.test(qNorm)) {
+    actionType = 'dong_goi';
+  } else if (/ban\s*giao|cho\s*kho|da\s*ban\s*giao|da\s*cho\s*kho|chuyen\s*kho/.test(qNorm)) {
+    actionType = 'ban_giao';
+  } else if (/nhan.*khau\s*1|nhan.*k1|lam.*khau\s*1|lam.*k1|nhan.*don|nhan.*mau/.test(qNorm)) {
     actionType = 'nhan_k1';
   } else if (/xong.*khau\s*1|xong.*k1|hoan\s*thanh.*khau\s*1|hoan\s*thanh.*k1|khau\s*1.*xong/.test(qNorm)) {
     actionType = 'xong_k1';
@@ -218,7 +232,8 @@ function detectVoiceProductionAction(query) {
   if (!actionType) return null;
 
   let workerName = 'Nguyễn Hoàng Dương';
-  if (/quang\s*anh|anh/.test(qNorm)) workerName = 'Hà Quang Anh';
+  if (actionType === 'dong_goi') workerName = 'Nguyễn Thị Diệu Hương';
+  else if (/quang\s*anh|anh/.test(qNorm)) workerName = 'Hà Quang Anh';
   else if (/huong/.test(qNorm)) workerName = 'Nguyễn Thị Diệu Hương';
   else if (/tien|sep/.test(qNorm)) workerName = 'Nguyễn Ngọc Tiến';
   else if (/trang/.test(qNorm)) workerName = 'Nguyễn Thị Huyền Trang';
