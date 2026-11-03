@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: rf-mcp-bridge
+    runtime: node
+    plan: free
+    buildCommand: echo 'No build step'
+    startCommand: node index.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: 20

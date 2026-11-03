@@ -1,0 +1,13 @@
+{
+  "name": "rf-mcp-bridge",
+  "version": "2.0.0",
+  "description": "Rich Fish Aquarium 24/7 Xiaozhi MCP Live Bridge",
+  "main": "index.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
